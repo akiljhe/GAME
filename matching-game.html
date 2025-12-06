@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mencocokkan Huruf & Angka - Petualangan Belajar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: linear-gradient(135deg, #FFD93D 0%, #FFA07A 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .draggable {
+            cursor: grab;
+            transition: all 0.3s ease;
+        }
+        .draggable:active {
+            cursor: grabbing;
+            transform: scale(1.1);
+        }
+        .dragging {
+            z-index: 1000;
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        .drop-zone {
+            transition: all 0.3s ease;
+            border: 3px dashed #ccc;
+        }
+        .drop-zone.drag-over {
+            border-color: #6BCF7F;
+            background-color: rgba(107, 207, 127, 0.1);
+            transform: scale(1.05);
+        }
+        .drop-zone.correct {
+            border-color: #6BCF7F;
+            background-color: rgba(107, 207, 127, 0.2);
+        }
+        .drop-zone.incorrect {
+            border-color: #FF6B9D;
+            background-color: rgba(255, 107, 157, 0.2);
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        .success-animation {
+            animation: celebrate 0.6s ease-out;
+        }
+        @keyframes celebrate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .level-indicator {
+            background: linear-gradient(45deg, #FFD93D, #FFA07A);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #6BCF7F, #95E1D3);
+            transition: width 0.5s ease;
+        }
+        .floating-score {
+            animation: floatUp 1s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="relative">
+    <!-- Header -->
+    <div class="bg-white/20 backdrop-blur-sm border-b border-white/30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBack()" class="flex items-center gap-2 text-white hover:text-yellow-200 transition-colors">
+                    <span class="text-2xl">←</span>
+                    <span class="font-semibold">Kembali</span>
+                </button>
+                
+                <div class="text-center">
+                    <h1 class="title-font text-2xl text-white">Mencocokkan Huruf & Angka</h1>
+                    <div class="flex items-center justify-center gap-2 mt-1">
+                        <span class="level-indicator font-bold">Level <span id="current-level">1</span></span>
+                        <span class="text-white/80">•</span>
+                        <span class="text-white/80"><span id="current-score">0</span> Poin</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <button onclick="showHint()" class="text-white hover:text-yellow-200 transition-colors">
+                        <span class="text-2xl">💡</span>
+                    </button>
+                    <button onclick="togglePause()" class="text-white hover:text-yellow-200 transition-colors">
+                        <span class="text-2xl" id="pause-btn">⏸️</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="mt-4">
+                <div class="flex justify-between text-white/80 text-sm mb-2">
+                    <span>Progress</span>
+                    <span><span id="completed-items">0</span>/<span id="total-items">6</span></span>
+                </div>
+                <div class="w-full bg-white/20 rounded-full h-3">
+                    <div class="progress-bar h-3 rounded-full" id="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Area -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Instructions -->
+        <div class="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-8 text-center">
+            <h2 class="title-font text-xl text-white mb-2">🎯 Petunjuk</h2>
+            <p class="text-white/90">
+                Drag huruf dan angka di bawah ini ke tempat yang sesuai! 
+                Cocokkan dengan benar untuk mendapatkan bintang!
+            </p>
+        </div>
+
+        <!-- Game Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Draggable Items -->
+            <div class="lg:col-span-1">
+                <h3 class="title-font text-lg text-white mb-4 text-center">🎒 Pilihan Jawaban</h3>
+                <div class="bg-white/20 backdrop-blur-sm rounded-2xl p-6">
+                    <div id="draggable-items" class="grid grid-cols-2 gap-4">
+                        <!-- Draggable items will be generated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Drop Zones -->
+            <div class="lg:col-span-2">
+                <h3 class="title-font text-lg text-white mb-4 text-center">🎯 Tempat Jawaban</h3>
+                <div id="drop-zones" class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <!-- Drop zones will be generated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Area -->
+        <div id="feedback-area" class="mt-8 text-center">
+            <!-- Feedback messages will appear here -->
+        </div>
+
+        <!-- Stars Display -->
+        <div class="fixed bottom-4 right-4 bg-white/20 backdrop-blur-sm rounded-2xl p-4">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">⭐</span>
+                <span class="text-white font-bold text-lg" id="stars-earned">0</span>
+                <span class="text-white/80 text-sm">Bintang</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4 text-center">
+            <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center">
+                <span class="text-3xl">🎉</span>
+            </div>
+            <h3 class="title-font text-2xl text-gray-800 mb-3">Selamat!</h3>
+            <p class="text-gray-600 mb-6">Kamu berhasil menyelesaikan level ini!</p>
+            
+            <div class="flex justify-center items-center gap-4 mb-6">
+                <span class="text-3xl">⭐</span>
+                <span class="text-2xl font-bold text-yellow-500" id="level-stars">3</span>
+                <span class="text-gray-600">Bintang</span>
+            </div>
+            
+            <div class="flex gap-3 justify-center">
+                <button onclick="nextLevel()" class="bg-gradient-to-r from-green-400 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Level Selanjutnya
+                </button>
+                <button onclick="goBack()" class="bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Menu Utama
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pause-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4 text-center">
+            <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                <span class="text-3xl">⏸️</span>
+            </div>
+            <h3 class="title-font text-2xl text-gray-800 mb-6">Game Dijeda</h3>
+            
+            <div class="flex gap-3 justify-center">
+                <button onclick="resumeGame()" class="bg-gradient-to-r from-green-400 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Lanjutkan
+                </button>
+                <button onclick="restartLevel()" class="bg-yellow-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Ulangi
+                </button>
+                <button onclick="goBack()" class="bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Menu Utama
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="simple-audio.js"></script>
+    <script>
+        // Matching Game Controller
+        class MatchingGame {
+            constructor() {
+                this.currentLevel = 1;
+                this.maxLevel = 5;
+                this.score = 0;
+                this.stars = 0;
+                this.completedItems = 0;
+                this.totalItems = 6;
+                this.isPaused = false;
+                this.draggedItem = null;
+                
+                this.levels = [
+                    {
+                        type: 'letters',
+                        items: ['A', 'B', 'C', 'D', 'E', 'F'],
+                        targets: ['A', 'B', 'C', 'D', 'E', 'F']
+                    },
+                    {
+                        type: 'numbers',
+                        items: ['1', '2', '3', '4', '5', '6'],
+                        targets: ['1', '2', '3', '4', '5', '6']
+                    },
+                    {
+                        type: 'mixed',
+                        items: ['A', '2', 'C', '4', 'E', '6'],
+                        targets: ['A', '2', 'C', '4', 'E', '6']
+                    },
+                    {
+                        type: 'words',
+                        items: ['A', 'P', 'P', 'L', 'E', '🍎'],
+                        targets: ['A', 'P', 'P', 'L', 'E', '🍎']
+                    },
+                    {
+                        type: 'math',
+                        items: ['1+1', '2+1', '1+2', '2+2', '3+1', '1+3'],
+                        targets: ['2', '3', '3', '4', '4', '4']
+                    }
+                ];
+                
+                this.init();
+            }
+
+            init() {
+                this.loadLevel();
+                this.setupDragAndDrop();
+                this.updateUI();
+            }
+
+            loadLevel() {
+                const levelData = this.levels[this.currentLevel - 1];
+                this.generateDraggableItems(levelData.items);
+                this.generateDropZones(levelData.targets);
+                this.completedItems = 0;
+                this.updateProgress();
+            }
+
+            generateDraggableItems(items) {
+                const container = document.getElementById('draggable-items');
+                container.innerHTML = '';
+                
+                // Shuffle items
+                const shuffledItems = [...items].sort(() => Math.random() - 0.5);
+                
+                shuffledItems.forEach((item, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'draggable bg-white rounded-2xl p-4 text-center font-bold text-2xl shadow-lg hover:shadow-xl transition-all cursor-grab';
+                    div.textContent = item;
+                    div.draggable = true;
+                    div.dataset.value = item;
+                    div.id = `draggable-${index}`;
+                    
+                    // Add color based on item type
+                    if (this.isLetter(item)) {
+                        div.style.color = '#6BCF7F';
+                        div.style.background = 'linear-gradient(135deg, #E8F5E8, #FFFFFF)';
+                    } else if (this.isNumber(item)) {
+                        div.style.color = '#FF6B9D';
+                        div.style.background = 'linear-gradient(135deg, #FFF0F5, #FFFFFF)';
+                    } else {
+                        div.style.color = '#FFD93D';
+                        div.style.background = 'linear-gradient(135deg, #FFFDE7, #FFFFFF)';
+                    }
+                    
+                    container.appendChild(div);
+                });
+            }
+
+            generateDropZones(targets) {
+                const container = document.getElementById('drop-zones');
+                container.innerHTML = '';
+                
+                targets.forEach((target, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'drop-zone bg-white/30 backdrop-blur-sm rounded-2xl p-8 text-center min-h-[100px] flex items-center justify-center';
+                    div.dataset.value = target;
+                    div.id = `drop-zone-${index}`;
+                    
+                    // Add placeholder text
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'text-white/60 text-lg font-semibold';
+                    placeholder.textContent = 'Letakkan di sini';
+                    div.appendChild(placeholder);
+                    
+                    container.appendChild(div);
+                });
+            }
+
+            setupDragAndDrop() {
+                // Drag events
+                document.addEventListener('dragstart', (e) => {
+                    if (e.target.classList.contains('draggable')) {
+                        this.draggedItem = e.target;
+                        e.target.classList.add('dragging');
+                        e.dataTransfer.setData('text/plain', e.target.dataset.value);
+                    }
+                });
+
+                document.addEventListener('dragend', (e) => {
+                    if (e.target.classList.contains('draggable')) {
+                        e.target.classList.remove('dragging');
+                        this.draggedItem = null;
+                    }
+                });
+
+                // Drop events
+                document.addEventListener('dragover', (e) => {
+                    if (e.target.classList.contains('drop-zone')) {
+                        e.preventDefault();
+                        e.target.classList.add('drag-over');
+                    }
+                });
+
+                document.addEventListener('dragleave', (e) => {
+                    if (e.target.classList.contains('drop-zone')) {
+                        e.target.classList.remove('drag-over');
+                    }
+                });
+
+                document.addEventListener('drop', (e) => {
+                    if (e.target.classList.contains('drop-zone') && this.draggedItem) {
+                        e.preventDefault();
+                        e.target.classList.remove('drag-over');
+                        
+                        const draggedValue = this.draggedItem.dataset.value;
+                        const targetValue = e.target.dataset.value;
+                        
+                        this.checkMatch(draggedValue, targetValue, e.target, this.draggedItem);
+                    }
+                });
+            }
+
+            checkMatch(draggedValue, targetValue, dropZone, draggedItem) {
+                if (this.isMatch(draggedValue, targetValue)) {
+                    // Correct match
+                    this.handleCorrectMatch(dropZone, draggedItem, targetValue);
+                } else {
+                    // Incorrect match
+                    this.handleIncorrectMatch(dropZone, draggedItem);
+                }
+            }
+
+            isMatch(dragged, target) {
+                // Handle different types of matches
+                if (dragged === target) return true;
+                
+                // For math problems
+                if (dragged.includes('+')) {
+                    try {
+                        const result = eval(dragged);
+                        return result == target;
+                    } catch (e) {
+                        return false;
+                    }
+                }
+                
+                return false;
+            }
+
+            handleCorrectMatch(dropZone, draggedItem, targetValue) {
+                // Add success styling
+                dropZone.classList.add('correct');
+                dropZone.innerHTML = `<div class="text-3xl font-bold text-green-600">${targetValue}</div>`;
+                
+                // Remove dragged item
+                draggedItem.style.display = 'none';
+                
+                // Add success animation
+                dropZone.classList.add('success-animation');
+                
+                // Update score
+                this.score += 10;
+                this.completedItems++;
+                
+                // Show floating score
+                this.showFloatingScore(draggedItem, '+10');
+                
+                // Check if level complete
+                if (this.completedItems >= this.totalItems) {
+                    setTimeout(() => {
+                        this.completeLevel();
+                    }, 1000);
+                }
+                
+                this.updateUI();
+                this.updateProgress();
+                
+                // Play success sound
+                this.playSuccessSound();
+            }
+
+            handleIncorrectMatch(dropZone, draggedItem) {
+                // Add error styling
+                dropZone.classList.add('incorrect');
+                
+                // Shake animation
+                anime({
+                    targets: draggedItem,
+                    translateX: [0, -20, 20, -10, 10, 0],
+                    duration: 500,
+                    easing: 'easeInOutQuad'
+                });
+                
+                // Remove error styling after animation
+                setTimeout(() => {
+                    dropZone.classList.remove('incorrect');
+                }, 500);
+                
+                // Play error sound
+                this.playErrorSound();
+            }
+
+            showFloatingScore(element, score) {
+                const floatingScore = document.createElement('div');
+                floatingScore.className = 'floating-score fixed text-2xl font-bold text-green-500 pointer-events-none z-50';
+                floatingScore.textContent = score;
+                floatingScore.style.left = element.getBoundingClientRect().left + 'px';
+                floatingScore.style.top = element.getBoundingClientRect().top + 'px';
+                
+                document.body.appendChild(floatingScore);
+                
+                setTimeout(() => {
+                    floatingScore.remove();
+                }, 1000);
+            }
+
+            completeLevel() {
+                // Calculate stars based on performance
+                this.stars = this.calculateStars();
+                
+                // Show success modal
+                document.getElementById('level-stars').textContent = this.stars;
+                document.getElementById('success-modal').classList.remove('hidden');
+                
+                // Save progress
+                this.saveProgress();
+                
+                // Play celebration sound
+                this.playCelebrationSound();
+            }
+
+            calculateStars() {
+                if (this.score >= this.totalItems * 10) return 3;
+                if (this.score >= this.totalItems * 7) return 2;
+                if (this.score >= this.totalItems * 5) return 1;
+                return 0;
+            }
+
+            nextLevel() {
+                if (this.currentLevel < this.maxLevel) {
+                    this.currentLevel++;
+                    this.score = 0;
+                    this.stars = 0;
+                    this.completedItems = 0;
+                    this.loadLevel();
+                    this.updateUI();
+                    
+                    // Hide success modal
+                    document.getElementById('success-modal').classList.add('hidden');
+                } else {
+                    // Game complete
+                    this.showGameComplete();
+                }
+            }
+
+            showGameComplete() {
+                const completeDiv = document.createElement('div');
+                completeDiv.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center';
+                completeDiv.innerHTML = `
+                    <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4 text-center">
+                        <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
+                            <span class="text-3xl">🏆</span>
+                        </div>
+                        <h3 class="title-font text-2xl text-gray-800 mb-3">Permainan Selesai!</h3>
+                        <p class="text-gray-600 mb-6">Selamat! Kamu telah menyelesaikan semua level!</p>
+                        <div class="flex gap-3 justify-center">
+                            <button onclick="restartGame()" class="bg-gradient-to-r from-green-400 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                                Main Lagi
+                            </button>
+                            <button onclick="goBack()" class="bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                                Menu Utama
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(completeDiv);
+            }
+
+            updateUI() {
+                document.getElementById('current-level').textContent = this.currentLevel;
+                document.getElementById('current-score').textContent = this.score;
+                document.getElementById('stars-earned').textContent = this.stars;
+                document.getElementById('total-items').textContent = this.totalItems;
+                document.getElementById('completed-items').textContent = this.completedItems;
+            }
+
+            updateProgress() {
+                const progress = (this.completedItems / this.totalItems) * 100;
+                document.getElementById('progress-bar').style.width = progress + '%';
+            }
+
+            isLetter(str) {
+                return /^[A-Za-z]$/.test(str);
+            }
+
+            isNumber(str) {
+                return /^\d+$/.test(str);
+            }
+
+            saveProgress() {
+                // Save to localStorage
+                const progress = JSON.parse(localStorage.getItem('gameProgress') || '{}');
+                if (!progress.matching) progress.matching = 0;
+                progress.matching += this.stars;
+                localStorage.setItem('gameProgress', JSON.stringify(progress));
+                
+                const totalStars = parseInt(localStorage.getItem('totalStars') || '0') + this.stars;
+                const totalScore = parseInt(localStorage.getItem('totalScore') || '0') + this.score;
+                localStorage.setItem('totalStars', totalStars.toString());
+                localStorage.setItem('totalScore', totalScore.toString());
+            }
+
+            // Audio functions
+            playSuccessSound() {
+                if (window.simpleAudio) {
+                    window.simpleAudio.playSound('success');
+                }
+            }
+
+            playErrorSound() {
+                if (window.simpleAudio) {
+                    window.simpleAudio.playSound('error');
+                }
+            }
+
+            playCelebrationSound() {
+                if (window.simpleAudio) {
+                    window.simpleAudio.playSound('celebration');
+                }
+            }
+
+            // Control functions
+            showHint() {
+                // Show hint animation
+                const hints = document.querySelectorAll('.drop-zone:not(.correct)');
+                hints.forEach((hint, index) => {
+                    setTimeout(() => {
+                        anime({
+                            targets: hint,
+                            scale: [1, 1.1, 1],
+                            duration: 300,
+                            easing: 'easeInOutQuad'
+                        });
+                    }, index * 200);
+                });
+            }
+
+            togglePause() {
+                this.isPaused = !this.isPaused;
+                const pauseBtn = document.getElementById('pause-btn');
+                const modal = document.getElementById('pause-modal');
+                
+                if (this.isPaused) {
+                    pauseBtn.textContent = '▶️';
+                    modal.classList.remove('hidden');
+                } else {
+                    pauseBtn.textContent = '⏸️';
+                    modal.classList.add('hidden');
+                }
+            }
+
+            resumeGame() {
+                this.togglePause();
+            }
+
+            restartLevel() {
+                this.score = 0;
+                this.completedItems = 0;
+                this.loadLevel();
+                this.updateUI();
+                document.getElementById('pause-modal').classList.add('hidden');
+            }
+
+            restartGame() {
+                this.currentLevel = 1;
+                this.score = 0;
+                this.stars = 0;
+                this.completedItems = 0;
+                this.loadLevel();
+                this.updateUI();
+                
+                // Remove complete modal
+                const completeModal = document.querySelector('.fixed.inset-0.bg-black\\/50');
+                if (completeModal && completeModal.innerHTML.includes('Permainan Selesai')) {
+                    completeModal.remove();
+                }
+            }
+        }
+
+        // Global functions
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+
+        function nextLevel() {
+            game.nextLevel();
+        }
+
+        function showHint() {
+            game.showHint();
+        }
+
+        function togglePause() {
+            game.togglePause();
+        }
+
+        function resumeGame() {
+            game.resumeGame();
+        }
+
+        function restartLevel() {
+            game.restartLevel();
+        }
+
+        function restartGame() {
+            game.restartGame();
+        }
+
+        // Initialize game
+        let game;
+        document.addEventListener('DOMContentLoaded', () => {
+            game = new MatchingGame();
+        });
+    </script>
+</body>
+</html>

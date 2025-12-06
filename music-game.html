@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Musik Interaktif - Petualangan Belajar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: linear-gradient(135deg, #C7CEEA 0%, #FFD93D 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .piano-key {
+            transition: all 0.15s ease;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        .piano-key:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .piano-key:active,
+        .piano-key.pressed {
+            transform: translateY(2px);
+            box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        .piano-key.white {
+            background: linear-gradient(135deg, #FFFFFF, #F0F0F0);
+            color: #333;
+        }
+        .piano-key.black {
+            background: linear-gradient(135deg, #333333, #000000);
+            color: white;
+            height: 60%;
+            width: 60%;
+            margin-left: -30%;
+            margin-right: -30%;
+            z-index: 2;
+        }
+        .song-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .song-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+        .song-card.playing {
+            background: linear-gradient(135deg, #6BCF7F, #95E1D3);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+        .visualizer-bar {
+            transition: height 0.1s ease;
+            background: linear-gradient(45deg, #FFD93D, #FF6B9D);
+        }
+        .note-animation {
+            animation: noteFloat 2s ease-out forwards;
+        }
+        @keyframes noteFloat {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+        .metronome-tick {
+            animation: tick 0.1s ease-out;
+        }
+        @keyframes tick {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="relative">
+    <!-- Header -->
+    <div class="bg-white/20 backdrop-blur-sm border-b border-white/30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBack()" class="flex items-center gap-2 text-white hover:text-indigo-200 transition-colors">
+                    <span class="text-2xl">←</span>
+                    <span class="font-semibold">Kembali</span>
+                </button>
+                
+                <div class="text-center">
+                    <h1 class="title-font text-2xl text-white">Musik Interaktif</h1>
+                    <div class="flex items-center justify-center gap-2 mt-1">
+                        <span class="text-white/80">Mode: <span id="current-mode">Bebas</span></span>
+                        <span class="text-white/80">•</span>
+                        <span class="text-white/80"><span id="current-score">0</span> Poin</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <button onclick="toggleMetronome()" class="text-white hover:text-indigo-200 transition-colors">
+                        <span class="text-2xl" id="metronome-btn">🎵</span>
+                    </button>
+                    <button onclick="toggleMode()" class="text-white hover:text-indigo-200 transition-colors">
+                        <span class="text-2xl" id="mode-btn">🎹</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Area -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Mode Selection -->
+        <div id="mode-selection" class="text-center mb-8">
+            <h2 class="title-font text-3xl text-white mb-6">Pilih Mode Bermain</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                <div class="mode-card bg-white/20 backdrop-blur-sm rounded-2xl p-8 cursor-pointer" onclick="selectMode('free')">
+                    <div class="text-6xl mb-4">🎹</div>
+                    <h3 class="title-font text-2xl text-white mb-3">Bebas Bermain</h3>
+                    <p class="text-white/80">Mainkan piano virtual dan ciptakan melodi sendiri!</p>
+                </div>
+                <div class="mode-card bg-white/20 backdrop-blur-sm rounded-2xl p-8 cursor-pointer" onclick="selectMode('songs')">
+                    <div class="text-6xl mb-4">🎵</div>
+                    <h3 class="title-font text-2xl text-white mb-3">Lagu Anak-Anak</h3>
+                    <p class="text-white/80">Mainkan lagu-lagu favorit anak-anak dengan mudah!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Free Play Mode -->
+        <div id="free-play-mode" class="hidden">
+            <!-- Piano Keyboard -->
+            <div class="bg-white/20 backdrop-blur-sm rounded-3xl p-8 mb-8">
+                <h3 class="title-font text-2xl text-white text-center mb-6">🎹 Piano Virtual</h3>
+                
+                <!-- Visualizer -->
+                <div class="flex justify-center items-end h-32 mb-6 space-x-1" id="audio-visualizer">
+                    <!-- Visualizer bars will be generated here -->
+                </div>
+                
+                <!-- Piano Keys -->
+                <div class="flex justify-center items-end" id="piano-keyboard">
+                    <!-- Piano keys will be generated here -->
+                </div>
+                
+                <!-- Controls -->
+                <div class="flex justify-center items-center gap-4 mt-6">
+                    <button onclick="clearRecording()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl font-semibold transition-all">
+                        🗑️ Hapus
+                    </button>
+                    <button onclick="toggleRecording()" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-xl font-semibold transition-all">
+                        <span id="record-btn">⏺️ Rekam</span>
+                    </button>
+                    <button onclick="playRecording()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-xl font-semibold transition-all">
+                        ▶️ Putar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Songs Mode -->
+        <div id="songs-mode" class="hidden">
+            <div class="bg-white/20 backdrop-blur-sm rounded-3xl p-8">
+                <h3 class="title-font text-2xl text-white text-center mb-6">🎵 Pilih Lagu Favorit</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="songs-grid">
+                    <!-- Song cards will be generated here -->
+                </div>
+                
+                <!-- Song Player -->
+                <div id="song-player" class="mt-8 text-center hidden">
+                    <div class="bg-white/20 backdrop-blur-sm rounded-2xl p-6 max-w-md mx-auto">
+                        <h4 class="title-font text-xl text-white mb-4" id="current-song-title">Lagu</h4>
+                        <div class="flex justify-center items-center gap-4 mb-4">
+                            <button onclick="previousNote()" class="bg-white/30 hover:bg-white/40 text-white p-3 rounded-full transition-all">
+                                ⏮️
+                            </button>
+                            <button onclick="toggleSongPlayback()" class="bg-green-500 hover:bg-green-600 text-white p-4 rounded-full transition-all">
+                                <span id="song-play-btn">▶️</span>
+                            </button>
+                            <button onclick="nextNote()" class="bg-white/30 hover:bg-white/40 text-white p-3 rounded-full transition-all">
+                                ⏭️
+                            </button>
+                        </div>
+                        <div class="text-white/80 text-sm">
+                            <span id="current-note">1</span> / <span id="total-notes">8</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Score Display -->
+        <div class="fixed bottom-4 right-4 bg-white/20 backdrop-blur-sm rounded-2xl p-4">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">⭐</span>
+                <span class="text-white font-bold text-lg" id="stars-earned">0</span>
+                <span class="text-white/80 text-sm">Bintang</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="simple-audio.js"></script>
+    <script>
+        // Music Game Controller
+        class MusicGame {
+            constructor() {
+                this.currentMode = null;
+                this.isRecording = false;
+                this.recording = [];
+                this.isPlaying = false;
+                this.currentSong = null;
+                this.currentNoteIndex = 0;
+                this.metronomeActive = false;
+                this.metronomeInterval = null;
+                this.score = 0;
+                this.stars = 0;
+                
+                // Piano notes (C major scale)
+this.notes = [
+    { note: 'C', frequency: 261.63, color: '#FF6B9D', key: 'white' },
+    { note: 'D', frequency: 293.66, color: '#FFD93D', key: 'white' },
+    { note: 'E', frequency: 329.63, color: '#6BCF7F', key: 'white' },
+    { note: 'F', frequency: 349.23, color: '#95E1D3', key: 'white' },
+    { note: 'G', frequency: 392.00, color: '#C7CEEA', key: 'white' },
+    { note: 'A', frequency: 440.00, color: '#FFA07A', key: 'white' },
+    { note: 'B', frequency: 493.88, color: '#DDA0DD', key: 'white' },
+    { note: 'C2', frequency: 523.25, color: '#FF6B9D', key: 'white' }
+];
+                
+                // Songs data
+                this.songs = [
+                    {
+                        id: 1,
+                        title: 'Twinkle Twinkle Little Star',
+                        notes: ['C', 'C', 'G', 'G', 'A', 'A', 'G', 'F', 'F', 'E', 'E', 'D', 'D', 'C'],
+                        tempo: 120,
+                        unlocked: true
+                    },
+                    {
+                        id: 2,
+                        title: 'Happy Birthday',
+                        notes: ['C', 'C', 'D', 'C', 'F', 'E', 'C', 'C', 'D', 'C', 'G', 'F', 'C', 'C', 'C2', 'A', 'F', 'E', 'D'],
+                        tempo: 100,
+                        unlocked: true
+                    },
+                    {
+                        id: 3,
+                        title: 'Mary Had a Little Lamb',
+                        notes: ['E', 'D', 'C', 'D', 'E', 'E', 'E', 'D', 'D', 'D', 'E', 'G', 'G', 'E', 'D', 'C', 'D', 'E', 'E', 'E', 'E', 'D', 'D', 'E', 'D', 'C'],
+                        tempo: 110,
+                        unlocked: true
+                    },
+                    {
+                        id: 4,
+                        title: 'Old MacDonald',
+                        notes: ['C', 'C', 'C', 'G', 'A', 'A', 'G', 'E', 'E', 'D', 'D', 'C'],
+                        tempo: 105,
+                        unlocked: false
+                    },
+                    {
+                        id: 5,
+                        title: 'If You\'re Happy',
+                        notes: ['C', 'C', 'G', 'G', 'A', 'A', 'G', 'F', 'F', 'E', 'E', 'D', 'D', 'C'],
+                        tempo: 130,
+                        unlocked: false
+                    },
+                    {
+                        id: 6,
+                        title: 'Baa Baa Black Sheep',
+                        notes: ['C', 'C', 'G', 'G', 'A', 'A', 'G', 'F', 'F', 'E', 'E', 'D', 'D', 'C'],
+                        tempo: 115,
+                        unlocked: false
+                    }
+                ];
+                
+                this.init();
+            }
+
+            init() {
+                this.generatePianoKeyboard();
+                this.generateAudioVisualizer();
+                this.generateSongsGrid();
+                this.updateUI();
+            }
+
+            generatePianoKeyboard() {
+                const container = document.getElementById('piano-keyboard');
+                container.innerHTML = '';
+                
+                this.notes.forEach((noteData, index) => {
+                    const key = document.createElement('div');
+                    key.className = `piano-key ${noteData.key} ${noteData.key === 'white' ? 'w-16 h-32' : 'w-10 h-20'} rounded-lg flex items-end justify-center p-2 font-bold text-sm`;
+                    key.style.background = noteData.color;
+                    key.textContent = noteData.note;
+                    key.dataset.note = noteData.note;
+                    key.dataset.frequency = noteData.frequency;
+                    
+                    key.addEventListener('mousedown', () => this.playNote(noteData.note));
+                    key.addEventListener('mouseup', () => this.stopNote());
+                    key.addEventListener('mouseleave', () => this.stopNote());
+                    
+                    container.appendChild(key);
+                });
+            }
+
+            generateAudioVisualizer() {
+                const container = document.getElementById('audio-visualizer');
+                container.innerHTML = '';
+                
+                // Create visualizer bars
+                for (let i = 0; i < 20; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'visualizer-bar w-2 bg-gradient-to-t from-purple-400 to-pink-400 rounded-t';
+                    bar.style.height = '10px';
+                    container.appendChild(bar);
+                }
+            }
+
+            generateSongsGrid() {
+                const container = document.getElementById('songs-grid');
+                container.innerHTML = '';
+                
+                this.songs.forEach(song => {
+                    const card = document.createElement('div');
+                    card.className = `song-card bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center ${song.unlocked ? 'cursor-pointer' : 'opacity-50'}`;
+                    card.onclick = () => song.unlocked && this.selectSong(song);
+                    
+                    card.innerHTML = `
+                        <div class="text-4xl mb-3">🎵</div>
+                        <h3 class="title-font text-lg text-white mb-2">${song.title}</h3>
+                        <div class="flex justify-center items-center gap-2 mb-2">
+                            <span class="text-sm text-white/80">${song.notes.length} nota</span>
+                            <span class="text-xs px-2 py-1 bg-white/20 rounded-full text-white">${song.tempo} BPM</span>
+                        </div>
+                        ${!song.unlocked ? '<div class="text-2xl">🔒</div>' : '<div class="text-sm text-white/60">Klik untuk mainkan</div>'}
+                    `;
+                    
+                    container.appendChild(card);
+                });
+            }
+
+            selectMode(mode) {
+                this.currentMode = mode;
+                document.getElementById('mode-selection').classList.add('hidden');
+                
+                if (mode === 'free') {
+                    document.getElementById('free-play-mode').classList.remove('hidden');
+                    document.getElementById('current-mode').textContent = 'Bebas';
+                } else if (mode === 'songs') {
+                    document.getElementById('songs-mode').classList.remove('hidden');
+                    document.getElementById('current-mode').textContent = 'Lagu';
+                }
+            }
+
+            playNote(note) {
+                const noteData = this.notes.find(n => n.note === note);
+                if (!noteData) return;
+                
+                // Find and style the key
+                const key = document.querySelector(`[data-note="${note}"]`);
+                if (key) {
+                    key.classList.add('pressed');
+                    
+                    // Remove pressed class after a short delay
+                    setTimeout(() => {
+                        key.classList.remove('pressed');
+                    }, 150);
+                }
+                
+                // Play the note (in a real implementation, this would use Web Audio API)
+                this.playTone(noteData.frequency);
+                
+                // Show note animation
+                this.showNoteAnimation(note);
+                
+                // Update visualizer
+                this.updateVisualizer(noteData.frequency);
+                
+                // Record if recording
+                if (this.isRecording) {
+                    this.recording.push({
+                        note: note,
+                        frequency: noteData.frequency,
+                        timestamp: Date.now()
+                    });
+                }
+                
+                // Add score
+                this.score += 1;
+                this.updateUI();
+            }
+
+            stopNote() {
+                // Stop the tone (in a real implementation)
+                this.stopTone();
+            }
+
+            playTone(frequency) {
+                if (window.simpleAudio) {
+                    return window.simpleAudio.playTone(frequency, 0.8, 'sine', 0.25);
+                }
+            }
+
+            playPianoNote(note) {
+                if (window.simpleAudio) {
+                    return window.simpleAudio.playPianoNote(note);
+                }
+            }
+
+            stopTone() {
+                if (this.currentOscillator && this.currentGainNode) {
+                    try {
+                        this.currentGainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+                        this.currentOscillator.stop(this.audioContext.currentTime + 0.1);
+                        
+                        this.currentOscillator = null;
+                        this.currentGainNode = null;
+                    } catch (e) {
+                        console.warn('Error stopping tone:', e);
+                    }
+                }
+            }
+
+            // Initialize audio context
+            initAudio() {
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('Web Audio API not supported');
+                }
+            }
+
+            showNoteAnimation(note) {
+                const animation = document.createElement('div');
+                animation.className = 'note-animation fixed text-3xl pointer-events-none z-50';
+                animation.textContent = '♪';
+                animation.style.left = Math.random() * window.innerWidth + 'px';
+                animation.style.top = window.innerHeight + 'px';
+                animation.style.color = this.notes.find(n => n.note === note)?.color || '#FFD93D';
+                
+                document.body.appendChild(animation);
+                
+                setTimeout(() => {
+                    animation.remove();
+                }, 2000);
+            }
+
+            updateVisualizer(frequency) {
+                const bars = document.querySelectorAll('.visualizer-bar');
+                const normalizedFreq = (frequency - 261.63) / (523.25 - 261.63); // Normalize to 0-1
+                const barIndex = Math.floor(normalizedFreq * bars.length);
+                
+                if (bars[barIndex]) {
+                    const height = Math.min(100, 20 + (frequency / 10));
+                    bars[barIndex].style.height = height + 'px';
+                    
+                    // Reset height after animation
+                    setTimeout(() => {
+                        bars[barIndex].style.height = '10px';
+                    }, 200);
+                }
+            }
+
+            animateVisualizer() {
+                const bars = document.querySelectorAll('.visualizer-bar');
+                bars.forEach((bar, index) => {
+                    setTimeout(() => {
+                        const height = Math.random() * 50 + 10;
+                        bar.style.height = height + 'px';
+                        
+                        setTimeout(() => {
+                            bar.style.height = '10px';
+                        }, 100);
+                    }, index * 50);
+                });
+            }
+
+            selectSong(song) {
+                this.currentSong = song;
+                this.currentNoteIndex = 0;
+                
+                // Show song player
+                const player = document.getElementById('song-player');
+                player.classList.remove('hidden');
+                
+                // Update song info
+                document.getElementById('current-song-title').textContent = song.title;
+                document.getElementById('total-notes').textContent = song.notes.length;
+                document.getElementById('current-note').textContent = '1';
+                
+                // Highlight the selected song card
+                document.querySelectorAll('.song-card').forEach(card => {
+                    card.classList.remove('playing');
+                });
+                event.target.closest('.song-card').classList.add('playing');
+            }
+
+            toggleSongPlayback() {
+                if (!this.currentSong) return;
+                
+                if (this.isPlaying) {
+                    this.stopSong();
+                } else {
+                    this.playSong();
+                }
+            }
+
+            playSong() {
+                this.isPlaying = true;
+                document.getElementById('song-play-btn').textContent = '⏸️';
+                
+                this.playNextNote();
+            }
+
+            stopSong() {
+                this.isPlaying = false;
+                document.getElementById('song-play-btn').textContent = '▶️';
+                
+                if (this.songTimeout) {
+                    clearTimeout(this.songTimeout);
+                }
+            }
+
+            playNextNote() {
+                if (!this.isPlaying || !this.currentSong) return;
+                
+                const note = this.currentSong.notes[this.currentNoteIndex];
+                this.playNote(note);
+                
+                // Update current note display
+                document.getElementById('current-note').textContent = this.currentNoteIndex + 1;
+                
+                // Move to next note
+                this.currentNoteIndex++;
+                
+                if (this.currentNoteIndex >= this.currentSong.notes.length) {
+                    // Song finished
+                    this.completeSong();
+                } else {
+                    // Schedule next note
+                    const noteDuration = (60 / this.currentSong.tempo) * 1000; // Convert BPM to milliseconds
+                    this.songTimeout = setTimeout(() => this.playNextNote(), noteDuration);
+                }
+            }
+
+            completeSong() {
+                this.stopSong();
+                this.currentNoteIndex = 0;
+                document.getElementById('current-note').textContent = '1';
+                
+                // Add score for completing song
+                this.score += 50;
+                this.stars += 1;
+                this.updateUI();
+                
+                // Show completion message
+                this.showCompletionMessage();
+                
+                // Unlock next song
+                this.unlockNextSong();
+            }
+
+            previousNote() {
+                if (this.currentSong && this.currentNoteIndex > 0) {
+                    this.currentNoteIndex--;
+                    document.getElementById('current-note').textContent = this.currentNoteIndex + 1;
+                    this.playNote(this.currentSong.notes[this.currentNoteIndex]);
+                }
+            }
+
+            nextNote() {
+                if (this.currentSong && this.currentNoteIndex < this.currentSong.notes.length - 1) {
+                    this.currentNoteIndex++;
+                    document.getElementById('current-note').textContent = this.currentNoteIndex + 1;
+                    this.playNote(this.currentSong.notes[this.currentNoteIndex]);
+                }
+            }
+
+            toggleRecording() {
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            }
+
+            startRecording() {
+                this.isRecording = true;
+                this.recording = [];
+                document.getElementById('record-btn').textContent = '⏹️ Berhenti';
+                
+                // Visual feedback
+                anime({
+                    targets: '#record-btn',
+                    scale: [1, 1.1, 1],
+                    duration: 1000,
+                    loop: true,
+                    easing: 'easeInOutQuad'
+                });
+            }
+
+            stopRecording() {
+                this.isRecording = false;
+                document.getElementById('record-btn').textContent = '⏺️ Rekam';
+                
+                // Stop animation
+                anime.remove('#record-btn');
+                
+                // Show recording saved message
+                this.showNotification('Rekaman disimpan!', 'success');
+            }
+
+            playRecording() {
+                if (this.recording.length === 0) {
+                    this.showNotification('Tidak ada rekaman!', 'error');
+                    return;
+                }
+                
+                this.showNotification('Memainkan rekaman...', 'info');
+                
+                // Play recorded notes with their original timing
+                this.recording.forEach((recordedNote, index) => {
+                    if (index === 0) {
+                        this.playNote(recordedNote.note);
+                    } else {
+                        const delay = recordedNote.timestamp - this.recording[0].timestamp;
+                        setTimeout(() => {
+                            this.playNote(recordedNote.note);
+                        }, delay);
+                    }
+                });
+            }
+
+            clearRecording() {
+                this.recording = [];
+                this.showNotification('Rekaman dihapus!', 'info');
+            }
+
+            toggleMetronome() {
+                if (this.metronomeActive) {
+                    this.stopMetronome();
+                } else {
+                    this.startMetronome();
+                }
+            }
+
+            startMetronome() {
+                this.metronomeActive = true;
+                document.getElementById('metronome-btn').textContent = '🔇';
+                
+                const bpm = 120;
+                const interval = (60 / bpm) * 1000;
+                
+                this.metronomeInterval = setInterval(() => {
+                    // Visual feedback
+                    const btn = document.getElementById('metronome-btn');
+                    btn.classList.add('metronome-tick');
+                    
+                    setTimeout(() => {
+                        btn.classList.remove('metronome-tick');
+                    }, 100);
+                    
+                    // Play tick sound (simulated)
+                    console.log('Metronome tick');
+                }, interval);
+            }
+
+            stopMetronome() {
+                this.metronomeActive = false;
+                document.getElementById('metronome-btn').textContent = '🎵';
+                
+                if (this.metronomeInterval) {
+                    clearInterval(this.metronomeInterval);
+                    this.metronomeInterval = null;
+                }
+            }
+
+            toggleMode() {
+                if (this.currentMode === 'free') {
+                    this.selectMode('songs');
+                    document.getElementById('free-play-mode').classList.add('hidden');
+                    document.getElementById('songs-mode').classList.remove('hidden');
+                } else {
+                    this.selectMode('free');
+                    document.getElementById('songs-mode').classList.add('hidden');
+                    document.getElementById('free-play-mode').classList.remove('hidden');
+                }
+            }
+
+            unlockNextSong() {
+                const currentSongIndex = this.songs.findIndex(song => song.id === this.currentSong?.id);
+                if (currentSongIndex !== -1 && currentSongIndex < this.songs.length - 1) {
+                    this.songs[currentSongIndex + 1].unlocked = true;
+                    this.generateSongsGrid();
+                }
+            }
+
+            showCompletionMessage() {
+                const message = document.createElement('div');
+                message.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-500 text-white px-6 py-4 rounded-2xl text-center z-50';
+                message.innerHTML = `
+                    <div class="text-2xl mb-2">🎉</div>
+                    <div class="font-bold">Lagu Selesai!</div>
+                    <div class="text-sm">+50 Poin, +1 Bintang</div>
+                `;
+                
+                document.body.appendChild(message);
+                
+                anime({
+                    targets: message,
+                    scale: [0, 1],
+                    opacity: [0, 1],
+                    easing: 'easeOutBack',
+                    duration: 500
+                });
+                
+                setTimeout(() => {
+                    anime({
+                        targets: message,
+                        scale: 0,
+                        opacity: 0,
+                        easing: 'easeInBack',
+                        duration: 300,
+                        complete: () => message.remove()
+                    });
+                }, 3000);
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `fixed top-4 right-4 px-6 py-3 rounded-xl shadow-lg z-50 ${
+                    type === 'success' ? 'bg-green-500' : 
+                    type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                } text-white`;
+                notification.textContent = message;
+                
+                document.body.appendChild(notification);
+                
+                anime({
+                    targets: notification,
+                    translateX: [300, 0],
+                    opacity: [0, 1],
+                    easing: 'easeOutExpo',
+                    duration: 500
+                });
+                
+                setTimeout(() => {
+                    anime({
+                        targets: notification,
+                        translateX: 300,
+                        opacity: 0,
+                        easing: 'easeInExpo',
+                        duration: 500,
+                        complete: () => notification.remove()
+                    });
+                }, 3000);
+            }
+
+            updateUI() {
+                document.getElementById('current-score').textContent = this.score;
+                document.getElementById('stars-earned').textContent = this.stars;
+            }
+
+            saveProgress() {
+                const progress = JSON.parse(localStorage.getItem('gameProgress') || '{}');
+                if (!progress.music) progress.music = 0;
+                progress.music += this.stars;
+                localStorage.setItem('gameProgress', JSON.stringify(progress));
+                
+                const totalStars = parseInt(localStorage.getItem('totalStars') || '0') + this.stars;
+                const totalScore = parseInt(localStorage.getItem('totalScore') || '0') + this.score;
+                localStorage.setItem('totalStars', totalStars.toString());
+                localStorage.setItem('totalScore', totalScore.toString());
+            }
+        }
+
+        // Global functions
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+
+        function selectMode(mode) {
+            game.selectMode(mode);
+        }
+
+        function selectSong(song) {
+            game.selectSong(song);
+        }
+
+        function toggleSongPlayback() {
+            game.toggleSongPlayback();
+        }
+
+        function previousNote() {
+            game.previousNote();
+        }
+
+        function nextNote() {
+            game.nextNote();
+        }
+
+        function toggleRecording() {
+            game.toggleRecording();
+        }
+
+        function playRecording() {
+            game.playRecording();
+        }
+
+        function clearRecording() {
+            game.clearRecording();
+        }
+
+        function toggleMetronome() {
+            game.toggleMetronome();
+        }
+
+        function toggleMode() {
+            game.toggleMode();
+        }
+
+        // Keyboard shortcuts for piano
+        document.addEventListener('keydown', (e) => {
+            const keyMap = {
+                'a': 'C', 's': 'D', 'd': 'E', 'f': 'F',
+                'g': 'G', 'h': 'A', 'j': 'B', 'k': 'C2'
+            };
+            
+            if (keyMap[e.key.toLowerCase()]) {
+                game.playNote(keyMap[e.key.toLowerCase()]);
+            }
+        });
+
+        // Initialize game
+        let game;
+        document.addEventListener('DOMContentLoaded', () => {
+            game = new MusicGame();
+            
+            // Initialize audio on first user interaction
+            document.addEventListener('click', () => {
+                if (!game.audioContext) {
+                    game.initAudio();
+                }
+            }, { once: true });
+        });
+    </script>
+</body>
+</html>

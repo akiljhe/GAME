@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Petualangan Belajar - Game Edukatif Anak-Anak</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://unpkg.com/splitting@1.0.6/dist/splitting.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://unpkg.com/splitting@1.0.6/dist/splitting.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: linear-gradient(135deg, #6BCF7F 0%, #C7CEEA 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .mascot-container {
+            animation: float 3s ease-in-out infinite;
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        .game-card {
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .game-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .particle-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .star-display {
+            background: linear-gradient(45deg, #FFD93D, #FFA07A);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="relative">
+    <!-- Particle Background -->
+    <div id="particle-bg" class="particle-bg"></div>
+
+    <!-- Main Container -->
+    <div class="container mx-auto px-4 py-8 relative z-10">
+        <!-- Header Section -->
+        <div class="text-center mb-12">
+            <div class="mascot-container mb-6">
+                <img src="https://kimi-web-img.moonshot.cn/img/img.freepik.com/9604bb8ccf333bf966fa72e822436a695e381a10.jpg" 
+                     alt="Mascot Character" 
+                     class="w-32 h-32 mx-auto rounded-full border-4 border-white shadow-lg object-cover pulse-animation">
+            </div>
+            <h1 class="title-font text-5xl md:text-6xl text-white mb-4 drop-shadow-lg" data-splitting>
+                Petualangan Belajar
+            </h1>
+            <p class="text-xl text-white/90 mb-6 max-w-2xl mx-auto">
+                Ayo bermain dan belajar dengan cara yang menyenangkan! 
+                Pilih game favoritmu dan mulai petualangan seru ini.
+            </p>
+            
+            <!-- Stats Display -->
+            <div class="flex justify-center items-center gap-6 mb-8">
+                <div class="bg-white/20 backdrop-blur-sm rounded-2xl px-6 py-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">⭐</span>
+                        <span class="text-white font-bold text-lg" id="total-stars">0</span>
+                        <span class="text-white/80 text-sm">Bintang</span>
+                    </div>
+                </div>
+                <div class="bg-white/20 backdrop-blur-sm rounded-2xl px-6 py-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">🏆</span>
+                        <span class="text-white font-bold text-lg" id="total-score">0</span>
+                        <span class="text-white/80 text-sm">Poin</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Selection Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <!-- Matching Game Card -->
+            <div class="game-card rounded-3xl p-8 text-center cursor-pointer" onclick="navigateToGame('matching-game.html')">
+                <div class="mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">🔤</span>
+                    </div>
+                    <h3 class="title-font text-2xl text-gray-800 mb-3">Mencocokkan Huruf & Angka</h3>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Cocokkan huruf dan angka dengan tempat yang benar. 
+                        Belajar sambil bermain!
+                    </p>
+                    <div class="flex justify-center items-center gap-2">
+                        <span class="star-display text-lg">⭐⭐⭐</span>
+                        <span class="text-gray-500 text-sm">Level 1-5</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz Game Card -->
+            <div class="game-card rounded-3xl p-8 text-center cursor-pointer" onclick="navigateToGame('quiz-game.html')">
+                <div class="mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-pink-400 to-red-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">🎨</span>
+                    </div>
+                    <h3 class="title-font text-2xl text-gray-800 mb-3">Kuis Warna & Bentuk</h3>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Uji pengetahuanmu tentang warna dan bentuk! 
+                        Jawab dengan cepat dan dapatkan bintang!
+                    </p>
+                    <div class="flex justify-center items-center gap-2">
+                        <span class="star-display text-lg">⭐⭐⭐</span>
+                        <span class="text-gray-500 text-sm">10 Soal</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Puzzle Game Card -->
+            <div class="game-card rounded-3xl p-8 text-center cursor-pointer" onclick="navigateToGame('puzzle-game.html')">
+                <div class="mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-400 to-blue-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">🧩</span>
+                    </div>
+                    <h3 class="title-font text-2xl text-gray-800 mb-3">Puzzle Seru</h3>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Susun potongan puzzle untuk melihat gambar yang lengkap! 
+                        Ada banyak pilihan gambar menarik!
+                    </p>
+                    <div class="flex justify-center items-center gap-2">
+                        <span class="star-display text-lg">⭐⭐⭐</span>
+                        <span class="text-gray-500 text-sm">6 Puzzle</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Music Game Card -->
+            <div class="game-card rounded-3xl p-8 text-center cursor-pointer" onclick="navigateToGame('music-game.html')">
+                <div class="mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-purple-400 to-indigo-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">🎵</span>
+                    </div>
+                    <h3 class="title-font text-2xl text-gray-800 mb-3">Musik Interaktif</h3>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Mainkan piano virtual dan dengarkan lagu anak-anak favorit! 
+                        Ciptakan melodi sendiri!
+                    </p>
+                    <div class="flex justify-center items-center gap-2">
+                        <span class="star-display text-lg">⭐⭐⭐</span>
+                        <span class="text-gray-500 text-sm">8 Lagu</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Card -->
+            <div class="game-card rounded-3xl p-8 text-center cursor-pointer" onclick="showProgress()">
+                <div class="mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">📊</span>
+                    </div>
+                    <h3 class="title-font text-2xl text-gray-800 mb-3">Progress Saya</h3>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Lihat perkembanganmu dalam setiap game! 
+                        Pantau prestasimu!
+                    </p>
+                    <div class="flex justify-center items-center gap-2">
+                        <span class="star-display text-lg">📈</span>
+                        <span class="text-gray-500 text-sm">Statistik</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Card -->
+            <div class="game-card rounded-3xl p-8 text-center cursor-pointer" onclick="showSettings()">
+                <div class="mb-6">
+                    <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-gray-400 to-gray-600 rounded-2xl flex items-center justify-center">
+                        <span class="text-3xl">⚙️</span>
+                    </div>
+                    <h3 class="title-font text-2xl text-gray-800 mb-3">Pengaturan</h3>
+                    <p class="text-gray-600 text-sm mb-4">
+                        Atur volume musik, efek suara, dan preferensi lainnya! 
+                        Sesuaikan pengalamanmu!
+                    </p>
+                    <div class="flex justify-center items-center gap-2">
+                        <span class="star-display text-lg">🔧</span>
+                        <span class="text-gray-500 text-sm">Custom</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-12">
+            <p class="text-white/80 text-sm">
+                © 2024 Petualangan Belajar - Game Edukatif untuk Anak-Anak
+            </p>
+        </div>
+    </div>
+
+    <!-- Progress Modal -->
+    <div id="progress-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4">
+            <h3 class="title-font text-2xl text-gray-800 mb-6 text-center">Progress Saya</h3>
+            <div id="progress-chart" class="h-64 mb-6"></div>
+            <div class="text-center">
+                <button onclick="closeModal()" class="bg-gradient-to-r from-pink-400 to-red-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4">
+            <h3 class="title-font text-2xl text-gray-800 mb-6 text-center">Pengaturan</h3>
+            
+            <div class="space-y-6">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700">Musik Latar</span>
+                    <input type="range" id="music-volume" min="0" max="100" value="70" class="w-32">
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700">Efek Suara</span>
+                    <input type="range" id="sfx-volume" min="0" max="100" value="80" class="w-32">
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-700">Mode Sederhana</span>
+                    <input type="checkbox" id="simple-mode" class="w-5 h-5">
+                </div>
+            </div>
+            
+            <div class="text-center mt-8">
+                <button onclick="saveSettings()" class="bg-gradient-to-r from-green-400 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Simpan
+                </button>
+                <button onclick="closeModal()" class="ml-3 bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Batal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="simple-audio.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

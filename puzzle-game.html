@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Seru - Petualangan Belajar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.18.0/matter.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: linear-gradient(135deg, #6BCF7F 0%, #95E1D3 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .puzzle-piece {
+            cursor: grab;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        .puzzle-piece:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .puzzle-piece:active {
+            cursor: grabbing;
+        }
+        .puzzle-piece.dragging {
+            z-index: 1000;
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+        }
+        .puzzle-piece.placed {
+            cursor: default;
+            border-color: #6BCF7F;
+            box-shadow: 0 0 20px rgba(107, 207, 127, 0.5);
+        }
+        .puzzle-slot {
+            border: 3px dashed rgba(255, 255, 255, 0.5);
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .puzzle-slot.drag-over {
+            border-color: #FFD93D;
+            background: rgba(255, 211, 61, 0.2);
+            transform: scale(1.05);
+        }
+        .puzzle-slot.filled {
+            border-color: #6BCF7F;
+            background: rgba(107, 207, 127, 0.2);
+        }
+        .puzzle-preview {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 1rem;
+            overflow: hidden;
+            opacity: 0.7;
+        }
+        .completion-celebration {
+            animation: celebrate 1s ease-out;
+        }
+        @keyframes celebrate {
+            0% { transform: scale(0) rotate(0deg); }
+            50% { transform: scale(1.2) rotate(180deg); }
+            100% { transform: scale(1) rotate(360deg); }
+        }
+        .floating-star {
+            animation: floatStar 2s ease-out forwards;
+        }
+        @keyframes floatStar {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+        .progress-ring {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .level-selector {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .level-card {
+            transition: all 0.3s ease;
+        }
+        .level-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+        .level-card.locked {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="relative">
+    <!-- Header -->
+    <div class="bg-white/20 backdrop-blur-sm border-b border-white/30">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <button onclick="goBack()" class="flex items-center gap-2 text-white hover:text-green-200 transition-colors">
+                    <span class="text-2xl">←</span>
+                    <span class="font-semibold">Kembali</span>
+                </button>
+                
+                <div class="text-center">
+                    <h1 class="title-font text-2xl text-white">Puzzle Seru</h1>
+                    <div class="flex items-center justify-center gap-2 mt-1">
+                        <span class="text-white/80">Puzzle <span id="current-puzzle">1</span>/6</span>
+                        <span class="text-white/80">•</span>
+                        <span class="text-white/80"><span id="current-score">0</span> Poin</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <button onclick="showHint()" class="text-white hover:text-green-200 transition-colors">
+                        <span class="text-2xl">💡</span>
+                    </button>
+                    <button onclick="togglePreview()" class="text-white hover:text-green-200 transition-colors">
+                        <span class="text-2xl" id="preview-btn">👁️</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="mt-4">
+                <div class="flex justify-between text-white/80 text-sm mb-2">
+                    <span>Progress</span>
+                    <span><span id="placed-pieces">0</span>/<span id="total-pieces">9</span></span>
+                </div>
+                <div class="w-full bg-white/20 rounded-full h-3">
+                    <div class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500" 
+                         id="progress-bar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Area -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Level Selection Screen -->
+        <div id="level-selection" class="text-center">
+            <h2 class="title-font text-3xl text-white mb-8">Pilih Puzzle</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto" id="level-grid">
+                <!-- Level cards will be generated here -->
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Puzzle Pieces -->
+                <div class="lg:col-span-1">
+                    <h3 class="title-font text-lg text-white mb-4 text-center">🧩 Potongan Puzzle</h3>
+                    <div class="bg-white/20 backdrop-blur-sm rounded-2xl p-6">
+                        <div id="puzzle-pieces" class="grid grid-cols-3 gap-3">
+                            <!-- Puzzle pieces will be generated here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Puzzle Board -->
+                <div class="lg:col-span-2">
+                    <h3 class="title-font text-lg text-white mb-4 text-center">🎯 Area Puzzle</h3>
+                    <div class="bg-white/20 backdrop-blur-sm rounded-2xl p-6">
+                        <div id="puzzle-board" class="grid grid-cols-3 gap-3 max-w-md mx-auto">
+                            <!-- Puzzle slots will be generated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Image -->
+            <div id="preview-container" class="mt-8 text-center hidden">
+                <h3 class="title-font text-lg text-white mb-4">👁️ Preview Gambar</h3>
+                <div class="flex justify-center">
+                    <div id="preview-image" class="puzzle-preview w-48 h-48 bg-cover bg-center">
+                        <!-- Preview image will be set here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Area -->
+        <div id="feedback-area" class="mt-8 text-center">
+            <!-- Feedback messages will appear here -->
+        </div>
+
+        <!-- Score Display -->
+        <div class="fixed bottom-4 right-4 bg-white/20 backdrop-blur-sm rounded-2xl p-4">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">⭐</span>
+                <span class="text-white font-bold text-lg" id="stars-earned">0</span>
+                <span class="text-white/80 text-sm">Bintang</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="success-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4 text-center">
+            <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center completion-celebration">
+                <span class="text-3xl">🎉</span>
+            </div>
+            <h3 class="title-font text-2xl text-gray-800 mb-3">Selamat!</h3>
+            <p class="text-gray-600 mb-6">Kamu berhasil menyelesaikan puzzle ini!</p>
+            
+            <div class="flex justify-center items-center gap-4 mb-6">
+                <span class="text-3xl">⭐</span>
+                <span class="text-2xl font-bold text-yellow-500" id="puzzle-stars">3</span>
+                <span class="text-gray-600">Bintang</span>
+            </div>
+            
+            <div class="flex gap-3 justify-center">
+                <button onclick="nextPuzzle()" class="bg-gradient-to-r from-green-400 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Puzzle Selanjutnya
+                </button>
+                <button onclick="backToLevelSelect()" class="bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                    Pilih Puzzle
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="simple-audio.js"></script>
+    <script>
+        // Puzzle Game Controller
+        class PuzzleGame {
+            constructor() {
+                this.currentPuzzle = 0;
+                this.totalPuzzles = 6;
+                this.score = 0;
+                this.stars = 0;
+                this.placedPieces = 0;
+                this.totalPieces = 9;
+                this.showingPreview = false;
+                this.draggedPiece = null;
+                
+                // Puzzle data with image URLs and difficulty
+                this.puzzles = [
+                    {
+                        id: 1,
+                        name: 'Kucing Lucu',
+                        image: 'https://kimi-web-img.moonshot.cn/img/img.freepik.com/9604bb8ccf333bf966fa72e822436a695e381a10.jpg',
+                        difficulty: 'Mudah',
+                        unlocked: true
+                    },
+                    {
+                        id: 2,
+                        name: 'Kelinci Imut',
+                        image: 'https://kimi-web-img.moonshot.cn/img/www.shutterstock.com/fcd0d54bb2ffb018d4f67067b026eaa1b1ef124f.jpg',
+                        difficulty: 'Mudah',
+                        unlocked: true
+                    },
+                    {
+                        id: 3,
+                        name: 'Beruang Manis',
+                        image: 'https://kimi-web-img.moonshot.cn/img/www.shutterstock.com/39e0c2436dea0bfcbac5394d1cbf081352ce9f99.jpg',
+                        difficulty: 'Sedang',
+                        unlocked: true
+                    },
+                    {
+                        id: 4,
+                        name: 'Gajah Gemuk',
+                        image: 'https://kimi-web-img.moonshot.cn/img/png.pngtree.com/9b7c776d6579f3341eea8346155809a7443301af.png',
+                        difficulty: 'Sedang',
+                        unlocked: false
+                    },
+                    {
+                        id: 5,
+                        name: 'Panda Lucu',
+                        image: 'https://kimi-web-img.moonshot.cn/img/img.freepik.com/f53c7fc22cd533145e41f2c45c36ccbd65c69880.jpg',
+                        difficulty: 'Sulit',
+                        unlocked: false
+                    },
+                    {
+                        id: 6,
+                        name: 'Singa Keren',
+                        image: 'https://kimi-web-img.moonshot.cn/img/thumbs.dreamstime.com/99d69e0cbcd8f0d17337ad3d3c1dcb3e3760b249.jpg',
+                        difficulty: 'Sulit',
+                        unlocked: false
+                    }
+                ];
+                
+                this.init();
+            }
+
+            init() {
+                this.generateLevelSelection();
+                this.setupDragAndDrop();
+                this.updateUI();
+            }
+
+            generateLevelSelection() {
+                const container = document.getElementById('level-grid');
+                container.innerHTML = '';
+                
+                this.puzzles.forEach((puzzle, index) => {
+                    const card = document.createElement('div');
+                    card.className = `level-card bg-white/20 backdrop-blur-sm rounded-2xl p-6 text-center cursor-pointer ${!puzzle.unlocked ? 'locked' : ''}`;
+                    card.onclick = () => puzzle.unlocked && this.selectPuzzle(index);
+                    
+                    card.innerHTML = `
+                        <div class="relative mb-4">
+                            <img src="${puzzle.image}" alt="${puzzle.name}" class="w-24 h-24 mx-auto rounded-xl object-cover">
+                            ${!puzzle.unlocked ? '<div class="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center"><span class="text-3xl">🔒</span></div>' : ''}
+                        </div>
+                        <h3 class="title-font text-lg text-white mb-2">${puzzle.name}</h3>
+                        <div class="flex justify-center items-center gap-2 mb-2">
+                            <span class="text-sm text-white/80">${puzzle.difficulty}</span>
+                            <span class="text-xs px-2 py-1 bg-white/20 rounded-full text-white">${index + 1}</span>
+                        </div>
+                        <div class="flex justify-center">
+                            ${this.getDifficultyStars(puzzle.difficulty)}
+                        </div>
+                    `;
+                    
+                    container.appendChild(card);
+                });
+            }
+
+            getDifficultyStars(difficulty) {
+                const stars = difficulty === 'Mudah' ? 1 : difficulty === 'Sedang' ? 2 : 3;
+                let html = '';
+                for (let i = 0; i < 3; i++) {
+                    html += `<span class="text-lg ${i < stars ? 'text-yellow-400' : 'text-gray-400'}">⭐</span>`;
+                }
+                return html;
+            }
+
+            selectPuzzle(index) {
+                this.currentPuzzle = index;
+                const puzzle = this.puzzles[index];
+                
+                // Hide level selection, show game screen
+                document.getElementById('level-selection').classList.add('hidden');
+                document.getElementById('game-screen').classList.remove('hidden');
+                
+                // Generate puzzle
+                this.generatePuzzle(puzzle);
+                this.updateUI();
+            }
+
+            generatePuzzle(puzzle) {
+                // Set preview image
+                const previewImage = document.getElementById('preview-image');
+                previewImage.style.backgroundImage = `url(${puzzle.image})`;
+                
+                // Generate puzzle pieces
+                this.generatePuzzlePieces(puzzle.image);
+                
+                // Generate puzzle slots
+                this.generatePuzzleSlots();
+                
+                // Reset state
+                this.placedPieces = 0;
+                this.updateProgress();
+            }
+
+            generatePuzzlePieces(imageUrl) {
+                const container = document.getElementById('puzzle-pieces');
+                container.innerHTML = '';
+                
+                // Create 9 puzzle pieces with different background positions
+                for (let i = 0; i < 9; i++) {
+                    const piece = document.createElement('div');
+                    piece.className = 'puzzle-piece bg-white/30 backdrop-blur-sm rounded-xl p-2 cursor-grab';
+                    piece.draggable = true;
+                    piece.dataset.pieceId = i;
+                    
+                    // Calculate background position for this piece
+                    const row = Math.floor(i / 3);
+                    const col = i % 3;
+                    const bgPosX = (col * -100) + '%';
+                    const bgPosY = (row * -100) + '%';
+                    
+                    piece.innerHTML = `
+                        <div class="w-full h-20 rounded-lg bg-cover bg-center" 
+                             style="background-image: url('${imageUrl}'); background-position: ${bgPosX} ${bgPosY};"
+                        ></div>
+                    `;
+                    
+                    container.appendChild(piece);
+                }
+                
+                // Shuffle pieces
+                this.shufflePieces();
+            }
+
+            shufflePieces() {
+                const container = document.getElementById('puzzle-pieces');
+                const pieces = Array.from(container.children);
+                
+                // Shuffle array
+                for (let i = pieces.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
+                }
+                
+                // Re-append in shuffled order
+                pieces.forEach(piece => container.appendChild(piece));
+            }
+
+            generatePuzzleSlots() {
+                const container = document.getElementById('puzzle-board');
+                container.innerHTML = '';
+                
+                for (let i = 0; i < 9; i++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'puzzle-slot rounded-xl aspect-square flex items-center justify-center min-h-[80px]';
+                    slot.dataset.slotId = i;
+                    
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'text-white/40 text-sm';
+                    placeholder.textContent = `${(Math.floor(i / 3) + 1)}-${((i % 3) + 1)}`;
+                    slot.appendChild(placeholder);
+                    
+                    container.appendChild(slot);
+                }
+            }
+
+            setupDragAndDrop() {
+                // Drag events for puzzle pieces
+                document.addEventListener('dragstart', (e) => {
+                    if (e.target.classList.contains('puzzle-piece')) {
+                        this.draggedPiece = e.target;
+                        e.target.classList.add('dragging');
+                        e.dataTransfer.setData('text/plain', e.target.dataset.pieceId);
+                    }
+                });
+
+                document.addEventListener('dragend', (e) => {
+                    if (e.target.classList.contains('puzzle-piece')) {
+                        e.target.classList.remove('dragging');
+                        this.draggedPiece = null;
+                    }
+                });
+
+                // Drop events for puzzle slots
+                document.addEventListener('dragover', (e) => {
+                    if (e.target.classList.contains('puzzle-slot')) {
+                        e.preventDefault();
+                        e.target.classList.add('drag-over');
+                    }
+                });
+
+                document.addEventListener('dragleave', (e) => {
+                    if (e.target.classList.contains('puzzle-slot')) {
+                        e.target.classList.remove('drag-over');
+                    }
+                });
+
+                document.addEventListener('drop', (e) => {
+                    if (e.target.classList.contains('puzzle-slot') && this.draggedPiece) {
+                        e.preventDefault();
+                        e.target.classList.remove('drag-over');
+                        
+                        const pieceId = parseInt(this.draggedPiece.dataset.pieceId);
+                        const slotId = parseInt(e.target.dataset.slotId);
+                        
+                        this.checkPlacement(pieceId, slotId, e.target, this.draggedPiece);
+                    }
+                });
+            }
+
+            checkPlacement(pieceId, slotId, slot, piece) {
+                if (pieceId === slotId) {
+                    // Correct placement
+                    this.handleCorrectPlacement(slot, piece);
+                } else {
+                    // Incorrect placement
+                    this.handleIncorrectPlacement(slot, piece);
+                }
+            }
+
+            handleCorrectPlacement(slot, piece) {
+                // Move piece to slot
+                slot.innerHTML = '';
+                slot.appendChild(piece);
+                
+                // Style the placed piece
+                piece.classList.add('placed');
+                piece.draggable = false;
+                piece.style.margin = '0';
+                
+                // Style the slot
+                slot.classList.add('filled');
+                
+                // Add celebration animation
+                anime({
+                    targets: piece,
+                    scale: [1, 1.1, 1],
+                    duration: 600,
+                    easing: 'easeInOutQuad'
+                });
+                
+                // Update progress
+                this.placedPieces++;
+                this.score += 10;
+                
+                // Show floating star
+                this.showFloatingStar(slot);
+                
+                // Check if puzzle complete
+                if (this.placedPieces >= this.totalPieces) {
+                    setTimeout(() => {
+                        this.completePuzzle();
+                    }, 1000);
+                }
+                
+                this.updateProgress();
+                this.updateUI();
+                
+                // Play success sound
+                this.playSuccessSound();
+            }
+
+            handleIncorrectPlacement(slot, piece) {
+                // Shake animation
+                anime({
+                    targets: piece,
+                    translateX: [0, -20, 20, -10, 10, 0],
+                    duration: 500,
+                    easing: 'easeInOutQuad'
+                });
+                
+                // Play error sound
+                this.playErrorSound();
+            }
+
+            showFloatingStar(element) {
+                const star = document.createElement('div');
+                star.className = 'floating-star fixed text-3xl pointer-events-none z-50';
+                star.textContent = '⭐';
+                star.style.left = element.getBoundingClientRect().left + 'px';
+                star.style.top = element.getBoundingClientRect().top + 'px';
+                
+                document.body.appendChild(star);
+                
+                setTimeout(() => {
+                    star.remove();
+                }, 2000);
+            }
+
+            completePuzzle() {
+                // Calculate stars based on time and moves (simplified)
+                this.stars = this.calculateStars();
+                
+                // Show success modal
+                document.getElementById('puzzle-stars').textContent = this.stars;
+                document.getElementById('success-modal').classList.remove('hidden');
+                
+                // Unlock next puzzle if available
+                if (this.currentPuzzle < this.puzzles.length - 1) {
+                    this.puzzles[this.currentPuzzle + 1].unlocked = true;
+                }
+                
+                // Save progress
+                this.saveProgress();
+                
+                // Play celebration sound
+                this.playCelebrationSound();
+                
+                // Add completion animation
+                const board = document.getElementById('puzzle-board');
+                board.classList.add('completion-celebration');
+            }
+
+            calculateStars() {
+                // Simple star calculation based on completion
+                if (this.placedPieces === this.totalPieces) {
+                    return 3; // Always 3 stars for now
+                }
+                return Math.floor(this.placedPieces / this.totalPieces * 3);
+            }
+
+            updateProgress() {
+                const progress = (this.placedPieces / this.totalPieces) * 100;
+                document.getElementById('progress-bar').style.width = progress + '%';
+                document.getElementById('placed-pieces').textContent = this.placedPieces;
+            }
+
+            updateUI() {
+                document.getElementById('current-puzzle').textContent = this.currentPuzzle + 1;
+                document.getElementById('current-score').textContent = this.score;
+                document.getElementById('stars-earned').textContent = this.stars;
+                document.getElementById('total-pieces').textContent = this.totalPieces;
+            }
+
+            // Control functions
+            showHint() {
+                // Highlight a random unplaced piece and its correct position
+                const unplacedPieces = Array.from(document.querySelectorAll('.puzzle-piece:not(.placed)'));
+                if (unplacedPieces.length > 0) {
+                    const randomPiece = unplacedPieces[Math.floor(Math.random() * unplacedPieces.length)];
+                    const pieceId = parseInt(randomPiece.dataset.pieceId);
+                    const correctSlot = document.querySelector(`[data-slot-id="${pieceId}"]`);
+                    
+                    // Highlight both piece and slot
+                    anime({
+                        targets: [randomPiece, correctSlot],
+                        scale: [1, 1.1, 1],
+                        duration: 800,
+                        easing: 'easeInOutQuad'
+                    });
+                }
+            }
+
+            togglePreview() {
+                const previewContainer = document.getElementById('preview-container');
+                const previewBtn = document.getElementById('preview-btn');
+                
+                this.showingPreview = !this.showingPreview;
+                
+                if (this.showingPreview) {
+                    previewContainer.classList.remove('hidden');
+                    previewBtn.textContent = '🙈';
+                } else {
+                    previewContainer.classList.add('hidden');
+                    previewBtn.textContent = '👁️';
+                }
+            }
+
+            nextPuzzle() {
+                if (this.currentPuzzle < this.puzzles.length - 1) {
+                    this.selectPuzzle(this.currentPuzzle + 1);
+                    document.getElementById('success-modal').classList.add('hidden');
+                } else {
+                    this.showGameComplete();
+                }
+            }
+
+            backToLevelSelect() {
+                document.getElementById('game-screen').classList.add('hidden');
+                document.getElementById('level-selection').classList.remove('hidden');
+                document.getElementById('success-modal').classList.add('hidden');
+                this.generateLevelSelection(); // Refresh to show unlocked puzzles
+            }
+
+            showGameComplete() {
+                const completeDiv = document.createElement('div');
+                completeDiv.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center';
+                completeDiv.innerHTML = `
+                    <div class="bg-white rounded-3xl p-8 max-w-md w-full mx-4 text-center">
+                        <div class="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center completion-celebration">
+                            <span class="text-3xl">🏆</span>
+                        </div>
+                        <h3 class="title-font text-2xl text-gray-800 mb-3">Semua Puzzle Selesai!</h3>
+                        <p class="text-gray-600 mb-6">Selamat! Kamu telah menyelesaikan semua puzzle!</p>
+                        <div class="flex gap-3 justify-center">
+                            <button onclick="restartGame()" class="bg-gradient-to-r from-green-400 to-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                                Main Lagi
+                            </button>
+                            <button onclick="backToLevelSelect()" class="bg-gray-400 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-lg transition-all">
+                                Menu Utama
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(completeDiv);
+            }
+
+            restartGame() {
+                // Reset all puzzles to locked except first two
+                this.puzzles.forEach((puzzle, index) => {
+                    puzzle.unlocked = index < 2;
+                });
+                
+                // Reset game state
+                this.score = 0;
+                this.stars = 0;
+                
+                // Remove complete modal
+                const completeModal = document.querySelector('.fixed.inset-0.bg-black\\/50');
+                if (completeModal && completeModal.innerHTML.includes('Semua Puzzle Selesai')) {
+                    completeModal.remove();
+                }
+                
+                this.backToLevelSelect();
+            }
+
+            saveProgress() {
+                const progress = JSON.parse(localStorage.getItem('gameProgress') || '{}');
+                if (!progress.puzzle) progress.puzzle = 0;
+                progress.puzzle += this.stars;
+                localStorage.setItem('gameProgress', JSON.stringify(progress));
+                
+                const totalStars = parseInt(localStorage.getItem('totalStars') || '0') + this.stars;
+                const totalScore = parseInt(localStorage.getItem('totalScore') || '0') + this.score;
+                localStorage.setItem('totalStars', totalStars.toString());
+                localStorage.setItem('totalScore', totalScore.toString());
+            }
+
+            // Audio functions
+            playSuccessSound() {
+                if (window.simpleAudio) {
+                    window.simpleAudio.playPiecePlace();
+                }
+            }
+
+            playErrorSound() {
+                if (window.simpleAudio) {
+                    window.simpleAudio.playSound('error');
+                }
+            }
+
+            playCelebrationSound() {
+                if (window.simpleAudio) {
+                    window.simpleAudio.playPuzzleComplete();
+                }
+            }
+        }
+
+        // Global functions
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+
+        function showHint() {
+            game.showHint();
+        }
+
+        function togglePreview() {
+            game.togglePreview();
+        }
+
+        function nextPuzzle() {
+            game.nextPuzzle();
+        }
+
+        function backToLevelSelect() {
+            game.backToLevelSelect();
+        }
+
+        function restartGame() {
+            game.restartGame();
+        }
+
+        // Initialize game
+        let game;
+        document.addEventListener('DOMContentLoaded', () => {
+            game = new PuzzleGame();
+        });
+    </script>
+</body>
+</html>
